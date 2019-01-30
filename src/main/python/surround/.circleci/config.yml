@@ -1,0 +1,81 @@
+version: 2.1
+jobs:
+  build:
+    docker:
+      - image: circleci/python:latest
+    steps:
+      - checkout
+  test-python-version:
+    parameters:
+      version:
+        type: string
+        default: "latest"
+    docker:
+      - image: circleci/python:<< parameters.version >>
+    steps:
+      - checkout
+      - run:
+          name: Run test for Python << parameters.version >>
+          command: |
+            sudo python setup.py install
+            sudo python setup.py test
+
+            sudo pip3 install pylint==2.2.2
+            sudo pip3 install Flask==1.0.2
+            sudo pip3 install gunicorn==19.9.0
+            pylint setup.py
+
+            find surround/ -iname "*.py" | xargs pylint
+            find examples/ -iname "*.py" | xargs pylint
+
+            ls examples/ | xargs -n 1 -I '{}' python examples/'{}'/main.py
+
+            mkdir ./temp
+            surround tutorial ./temp
+            surround init ./temp -p project -d "A test project"
+
+            cd ./temp/tutorial
+            python3 -m tutorial -o data/output/ -i data/input/ -c tutorial/config.yaml
+            [ -f ./data/output/output.txt ]
+
+            cd ../project
+            python3 -m project -o data/output/ -i data/input/ -c project/config.yaml
+            [ -f ./data/output/output.txt ]
+
+  release:
+    docker:
+      - image: circleci/python:latest
+    steps:
+      - checkout
+      - run:
+          name: Release to Pypi
+          command: |
+            # Install required packages
+            python -m pip install --user --upgrade setuptools wheel twine
+
+            # Setup Pypi config
+            echo -e "[pypi]" >> ~/.pypirc
+            echo -e "repository:https://upload.pypi.org/legacy/" >> ~/.pypirc
+            echo -e "username:$PYPI_USERNAME" >> ~/.pypirc
+            echo -e "password:$PYPI_PASSWORD" >> ~/.pypirc
+
+            # Build package
+            VERSION_TAG=$(git tag -l --points-at HEAD) python setup.py sdist bdist_wheel
+
+            # Upload package for distribution
+            python -m twine upload --repository pypi dist/*
+
+workflows:
+  version: 2.1
+  test-and-relese:
+    jobs:
+    - build
+    - test-python-version:
+        version: "3.6.5"
+    - test-python-version
+    - release:
+        filters:
+          tags:
+            only: /v([0-9]+)\.([0-9]+)\.([0-9])?$/
+          branches:
+            ignore: /.*/

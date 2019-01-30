@@ -1,0 +1,27 @@
+# Compiled python modules.
+*.pyc
+
+# Setuptools distribution folder.
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools.
+**/*.egg-info
+
+/__pycache__/
+/build/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+.DS_Store
+.vscode
+.python-version
+
+# Ignore text output files
+/examples/file-adapter/data/output.txt
