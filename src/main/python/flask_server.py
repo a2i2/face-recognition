@@ -1,5 +1,4 @@
 from flask import Flask, url_for, send_from_directory, request, make_response, flash, redirect, render_template
-from face_encoder.pipeline import Pipeline
 from PIL import Image
 from flask import send_file
 import json
