@@ -1,0 +1,33 @@
+# @TODO 'parallel' and 'forceRetry' are mutually-exclusive options, but there is currently no logic in the code to enforce this.
+# For now, just make sure only one of them is true!
+
+pathToModels: /opt/theia/src/main/resources/models
+# pathToModels: D:\theai\theia-master\ai\src\main\resources\models
+timesToUpsample: 0                                               # Up sampling finds smaller faces in an image
+model: hog                                                       # 'hog' or 'cnn'
+distanceThreshold: 0.95                                          # Threshold to determine if two face encodings match
+minFaceWidth: 100                                                # Threshold for the width of a face bounding box in pixels
+minFaceHeight: 125                                               # Threshold for the height of a face bounding box in pixels
+enableStageOutputDump: false                                     # Output data from each transformation. Set to False in production.
+googleNetConfidence: 0.5                                         # Confidence threshold for accepting a face detection
+useAllFaces: false                                               # If false, only extract encodings for the largest face
+aggregateResults: false                                          # If true, the script will aggregate all individual results files into a single one
+forceRetry: true                                                 # If true, files that already have a result will be processed again anyway.
+imageTooDark: 23                                                 # Threshold for determining if an image is too dark, lower values = darker image
+blurryThreshold: 4                                               # Smaller values indicate a "more" blurry image
+alwaysCreateEncoding: false                                      # Overrides all errors by creating a 128 encoding of random numbers, [0,1)
+gpuDynamicMemoryAllocation: true                                 # If true, Tensorflow will allocate GPU memory on an as-needs basis. perProcessGpuMemoryFraction will have no effect.
+perProcessGpuMemoryFraction: 0.5                                 # Fraction of GPU memory Tensorflow should acquire. Has no effect if gpuDynamicMemoryAllocation is true.
+parallel: false                                                  # If true, multiple processing nodes can be pointed at the same input folder. The list of input files will be shuffled to accommodate this.
+printStageProcessingTime: false                                  # Enables/disables the calculation and printing of stage processing times.
+rotateImageModelFile: image-rotator/image-rotator-2018-04-05.pb  # Model used to detect the orientation of the image
+rotateImageModelLabels: image-rotator/labels.txt                 # Model used to detect the orientation of the image
+rotateImageInputLayer: conv2d_1_input                            # Tensorflow input layer
+rotateImageOutputLayer: activation_5/Softmax                     # Tensorflow output layer
+rotateImageInputHeight: 100                                      # Input image height to the image stage neural network
+rotateImageInputWidth: 100                                       # Input image width to the image stage neural network
+rotateImageThreshold: 0.5                                        # Rotate image if the orientation is above this threshold
+rotateImageSkip: false                                           # Option to skip image rotation step
+imageSizeMax: 700
+appUrl: https://github.com/dstil/theia/
+dbRetryTime: 1                                                   # Time in seconds before attempting to reconnect to Postgres

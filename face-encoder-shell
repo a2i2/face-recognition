@@ -1,0 +1,45 @@
+#!/bin/bash
+
+###
+# Prints the given string as a "heading" with coloured output.
+###
+function print_heading {
+  echo
+  echo "$(tput setaf 2)===[ ${1} ]===================$(tput sgr 0)"
+  echo
+}
+
+# Image version variables.
+base_image="tensorflow/tensorflow:1.6.0-py3"
+version="local"
+
+# If specified, the given command will be run inside the container.
+COMMAND="python flask_server.py"
+
+# Support executing the GPU variant of the container.
+if [ $GPU ]; then
+  base_image="tensorflow/tensorflow:1.6.0-gpu-py3"
+  version="${version}-gpu"
+fi
+
+# Support overriding container version.
+if [ ! -z "${VERSION}" ]; then
+  version="${VERSION}"
+else
+  print_heading "Building image: dstilab/face-encoder:${version}"
+  docker build --build-arg BASE_IMAGE=${base_image} -t dstilab/face-encoder:${version} .
+fi
+
+# Support sharing a directory with the container.
+if [ ! -z "${VOLUME}" ]; then
+  volume_flag="--volume ${VOLUME}:${VOLUME}"
+fi
+
+# Run $COMMAND in the container if specified, otherwise start an interactive shell.
+if [ ! -z "${COMMAND}" ]; then
+  print_heading "Running '${COMMAND}' in dstilab/face-encoder:${version}"
+  docker run -p 80:80 ${volume_flag} --workdir /opt/theia/src/main/python -it dstilab/face-encoder:${version} bash -c "${COMMAND}"
+else
+  print_heading "Starting interactive shell in dstilab/face-encoder:${version}"
+  docker run -p 80:80 ${volume_flag} --workdir /opt/theia/src/main/python -it dstilab/face-encoder:${version} bash
+fi

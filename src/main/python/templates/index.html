@@ -1,0 +1,68 @@
+<!DOCTYPE>
+<html>
+  <head>
+  <title>Face Recognition Demo</title>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='index.css') }}">
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.js"></script> 
+    <script src="http://malsup.github.com/jquery.form.js"></script> 
+    <script src="{{ url_for('static',filename='index.js') }}"></script>
+  </head>
+
+  <body>
+  <div id="firstImg"> 
+    <form id="upload-form1" action="{{ url_for('upload') }}" method="POST">
+      <strong>Image 1:</strong><br>
+      <input id="file-picker1" onchange="previewFile1()" type="file" name="file" accept="image/"><br>
+      <img id="img1" src="{{ url_for('static',filename='no_image_icon.png') }}" height="200" alt="Image preview..."><br>
+      <input type="submit" value="Encode" onclick="previewFile1()" id="upload-button">
+    </form>
+
+    <div id="encoding1_txt"></div>
+
+  </div>
+    <div id="secondImg">
+      <form id="upload-form2" action="{{ url_for('upload') }}" method="POST">
+        <strong>Image 2:</strong><br>
+        <input id="file-picker2" onchange="previewFile2()" type="file" name="file" accept="image/"><br>
+        <img id="img2" src="{{ url_for('static',filename='no_image_icon.png') }}" height="200" alt="Image preview..."><br>
+        <input type="submit" value="Encode" onclick="previewFile2()" id="upload-button">
+      </form>
+
+      <div id="encoding2_txt"></div>
+    </div>
+
+    <br>
+
+    <div id="compareBtn">
+      <form id="compare-form" action="{{ url_for('compare_json') }}" method="POST">
+        <input name="encoding1" value= "" id="encoding1"></input>
+        <input name="encoding2" value= "" id="encoding2"></input>
+        <input type="submit" value="Compare" id="compare-button">
+      </form>
+    </div>
+  </body>
+
+  <script>
+    $(document).ready(function() { 
+      $('#upload-form2').ajaxForm(function(data) { 
+        document.getElementById("encoding2_txt").innerHTML = data;
+        document.getElementById("encoding2").value = data;
+      }); 
+    });
+
+    $(document).ready(function() { 
+      $('#compare-form').ajaxForm(function(data) { 
+        alert(data);
+      });   
+    });
+
+    $(document).ready(function() { 
+      $('#upload-form1').ajaxForm(function(data) { 
+        document.getElementById("encoding1_txt").innerHTML = data;
+        document.getElementById("encoding1").value = data;
+      });
+    });
+  </script>
+</html>
+
