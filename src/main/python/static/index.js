@@ -12,6 +12,11 @@ function previewFile1(){
   } else {
     preview.src = "";
   }
+
+  //reset fields
+  document.getElementById("encoding1_txt").innerHTML = "";
+  document.getElementById("encoding1").value = "";
+  document.getElementById("result_placeholder").innerHTML = "";
 }
 
 function previewFile2() {
@@ -28,4 +33,9 @@ function previewFile2() {
   } else {
     preview.src = "";
   }
+
+  //reset fields
+  document.getElementById("encoding2_txt").innerHTML = "";
+  document.getElementById("encoding2").value = "";
+  document.getElementById("result_placeholder").innerHTML = "";
 }

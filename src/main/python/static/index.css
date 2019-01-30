@@ -1,4 +1,6 @@
 #firstImg {float:left;}
+#secondImg {float:left;}
 #encoding1_txt, #encoding2_txt {height: 200px; width : 190px; overflow: auto;}
 #encoding1, #encoding2 {display: none;}
-#compareBtn {clear:left;}
+/*#compareBtn {clear:left;}*/
+#compareBtn {float:left;}

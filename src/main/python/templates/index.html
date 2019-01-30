@@ -41,6 +41,11 @@
         <input type="submit" value="Compare" id="compare-button">
       </form>
     </div>
+
+    <div id="result">
+    	<div>Result: </div>
+    	<div id="result_placeholder"></div>
+    </div>
   </body>
 
   <script>
@@ -53,7 +58,13 @@
 
     $(document).ready(function() { 
       $('#compare-form').ajaxForm(function(data) { 
-        alert(data);
+        // alert(data);
+        var distance = parseFloat(data)
+        if (distance <= 0.75) {
+        	document.getElementById("result_placeholder").innerHTML = "Match " + "(" + distance + ")";
+        } else {
+        	document.getElementById("result_placeholder").innerHTML = "No Match " + "(" + distance + ")";
+        }
       });   
     });
 
