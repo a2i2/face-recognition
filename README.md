@@ -4,17 +4,14 @@ An example project for Surround using face recognition models. The pipeline we p
 
 ![Work flow diagram](docs/diagram.PNG)
 
----
 ## Machine learning framework
 
 [Surround](https://github.com/dstil/surround), a framework for serving machine learning pipeline is used, each image data is put through 8 stages which represents different image transformation. The output of this process is either error messages or valid encodings.
 
 ![Surround Stages diagram](docs/diagram2.PNG)
 
----
 ## Dependencies
 * Docker 18.03.0-ce
----
 
 ## Running web server
 
@@ -28,6 +25,5 @@ The webserver can handle POST request with image data and return encodings or er
 
 ![Web interface](docs/website.PNG)
 
----
 
 More information available on [this blog post](https://github.com/DungLai/face-recognition/blob/master/docs/blog.docx)
