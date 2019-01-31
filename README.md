@@ -26,4 +26,4 @@ The webserver can handle POST request with image data and return encodings or er
 ![Web interface](docs/website.PNG)
 
 
-More information available on [this blog post](https://github.com/DungLai/face-recognition/blob/master/docs/blog.docx)
+More information available on [this blog post](https://github.com/DungLai/face-recognition/blob/master/docs/blog.pdf)
