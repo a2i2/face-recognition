@@ -1,3 +1,30 @@
-# face-recognition
+# Surround Tutorial
 
-An example project for Surround using face recognition models. 
+Welcome to the Surround tutorial project!!!
+
+## View help
+
+`python3 -m face-recognition -h`
+
+## Run the project
+
+`python3 -m face-recognition -o data/output/ -i data/input/ -c tutorial/config.yaml`
+
+## Project structure
+
+<pre>
+.
+├── README.md
+├── requirements.txt                # Python dependencies
+├── docs                            # Documentation and getting started guide etc.
+├── models                          # Holds trained or downloaded models (not managed by git!)
+├── notebooks                       # Store Jupyter notebooks for data analysis
+├── scripts                         # Miscellaneous scripts e.g. for calculating metrics
+├── face-recognition                # Python package for the new project
+│   ├── config.yaml
+│   ├── __main__.py                 # Entry point for running the application
+│   └── stages.py                   # Core functionality for the project starts in this module
+└── data                            # Data files are stored here (not managed by git!)
+    ├── input                       # Input data for the project goes here
+    └── output                      # Save all files here except model files
+</pre>
