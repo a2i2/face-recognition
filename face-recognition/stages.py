@@ -105,8 +105,9 @@ class RotateImage(Stage):
         return label
 
     def init_stage(self, config):
-        self.labels = self.load_labels(os.path.join(config["pathToModels"],config["rotateImageModelLabels"]))
-        model_path = os.path.join(config["pathToModels"], config["rotateImageModelFile"])
+        models_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), config["pathToModels"])
+        self.labels = self.load_labels(os.path.join(models_dir, config["rotateImageModelLabels"]))
+        model_path = os.path.join(os.path.join(models_dir, config["rotateImageModelFile"]))
         self.graph = tf.Graph()
         graph_def = tf.GraphDef()
 
@@ -146,7 +147,6 @@ class RotateImage(Stage):
         if config["rotateImageSkip"]:
             return
 
-        self.init_stage(config)
 
         if self.has_model:
             input_name = "import/" + config["rotateImageInputLayer"]
@@ -202,7 +202,8 @@ class DetectAndAlignFaces(Stage):
 
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
             with sess.as_default():
-                model_path = os.path.join(config["pathToModels"], "Multi-task-CNN")
+                models_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), config["pathToModels"])
+                model_path = os.path.join(models_dir, "Multi-task-CNN")
                 self.has_model = os.path.exists(model_path)
 
                 if not self.has_model:
@@ -231,7 +232,6 @@ class DetectAndAlignFaces(Stage):
         return bounding_boxes
 
     def operate(self, surround_data, config):
-        self.init_stage(config)
         assert not self.pnet is None and not self.rnet is None and not self.onet is None, "NN not setup correctly"
         if self.has_model:
             bounding_boxes = self.look_for_faces(surround_data.image_rgb_array, config)
@@ -328,7 +328,8 @@ class ExtractEncodingsResNet1(Stage):
 
             self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
             with self.sess.as_default():
-                model_path = os.path.join(config["pathToModels"], "20170512-110547", "20170512-110547.pb")
+                models_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), config["pathToModels"])
+                model_path = os.path.join(models_dir, "20170512-110547", "20170512-110547.pb")
                 self.has_model = os.path.exists(model_path)
 
                 if not self.has_model:
@@ -345,7 +346,6 @@ class ExtractEncodingsResNet1(Stage):
                         self.phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
 
     def operate(self, surround_data, config):
-        self.init_stage(config)
         self.resized_images = list()
 
         if self.has_model:

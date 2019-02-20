@@ -1,4 +1,4 @@
-pathToModels: /opt/theia/src/main/resources/models
+pathToModels: ../models
 model: hog                                                       # 'hog' or 'cnn'
 minFaceWidth: 100                                                # Threshold for the width of a face bounding box in pixels
 minFaceHeight: 125                                               # Threshold for the height of a face bounding box in pixels

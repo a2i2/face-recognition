@@ -17,7 +17,6 @@ from .stages import *
 logging.basicConfig(level=logging.INFO)
 
 # Validation functions for the command line parser below
-
 def is_valid_dir(arg_parser, arg):
     if not os.path.isdir(arg):
         arg_parser.error("Invalid directory %s" % arg)
@@ -64,6 +63,7 @@ def load_data(input_dir, output_dir, config_path):
     config.read_config_files([config_path])
 
     surround.set_config(config)
+    surround.init_stages()
 
     # Surround operates on an instance of SurroundData. In this case
     # the input data is a string 'data'. See stages.py for more
