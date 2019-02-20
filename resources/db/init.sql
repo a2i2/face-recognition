@@ -24,5 +24,6 @@ CREATE TABLE face (
 CREATE INDEX person_name_idx           ON person(name);
 CREATE INDEX face_person_id_idx        ON face(person_id);
 CREATE INDEX face_photo_md5_idx        ON face(photo_md5);
+CREATE INDEX face_photo_md5_idx        ON face(photo_filename);
 CREATE INDEX face_encoder_version_idx  ON face(encoder_version);
 CREATE INDEX face_encoder_batch_id_idx ON face(encoder_batch_id);
