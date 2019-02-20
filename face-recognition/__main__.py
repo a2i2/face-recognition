@@ -4,6 +4,8 @@ import os
 import json
 from surround import Surround, Config
 from .stages import *
+from .server import SurroundWebApplication
+from tornado.ioloop import IOLoop
 
 # Data Science projects should use logging over print statements:
 #
@@ -31,13 +33,13 @@ def is_valid_file(arg_parser, arg):
 
 # Set up the parser for command line arguments
 parser = argparse.ArgumentParser(description="The Surround Command Line Interface")
-parser.add_argument('-o', '--output-dir', required=True, help="Output directory",
-                                     type=lambda x: is_valid_dir(parser, x))
-
-parser.add_argument('-i', '--input-dir', required=True, help="Input directory",
-                                     type=lambda x: is_valid_dir(parser, x))
-parser.add_argument('-c', '--config-file', required=True, help="Path to config file",
-                                     type=lambda x: is_valid_file(parser, x))
+# parser.add_argument('-o', '--output-dir', required=True, help="Output directory",
+#                                      type=lambda x: is_valid_dir(parser, x))
+#
+# parser.add_argument('-i', '--input-dir', required=True, help="Input directory",
+#                                      type=lambda x: is_valid_dir(parser, x))
+# parser.add_argument('-c', '--config-file', required=True, help="Path to config file",
+#                                      type=lambda x: is_valid_file(parser, x))
 
 def load_data(input_dir, output_dir, config_path):
 
@@ -93,4 +95,11 @@ def load_data(input_dir, output_dir, config_path):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    load_data(args.input_dir, args.output_dir, args.config_file)
+    http_server = SurroundWebApplication(debug=False)
+    http_server.listen(8888)
+
+    logging.info("HTTP server listening on 8888")
+    IOLoop.instance().start()
+    logging.info("Server has shut down.")
+
+    # load_data(args.input_dir, args.output_dir, args.config_file)
