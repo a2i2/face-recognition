@@ -1,11 +1,16 @@
 import datetime
 import traceback
 import json
+import uuid
+import hashlib
 import tornado.web
 from tornado.escape import json_encode, json_decode
+from .db import PostgresClient
+from .entities import Person, Face
 
 
 START_TIME = datetime.datetime.now()
+POSTGRES_CLIENT = PostgresClient("face_recognition", "postgres", "localhost", 5432, "postgres")
 
 
 class SurroundWebApplication(tornado.web.Application):
@@ -13,12 +18,12 @@ class SurroundWebApplication(tornado.web.Application):
         kwargs["handlers"] = [
             (r"/", MainHandler),
             (r"/info", InfoHandler),
-            (r"/persons/(?P<person_id>\w+)", PersonHandler),
-            (r"/persons", PersonCollectionHandler),
+            (r"/persons/(?P<person_id>.*)/faces/(?P<face_id>.*)", FaceHandler),
+            (r"/persons/(?P<person_id>.*)/faces", FaceHandler),
+            (r"/persons/(?P<person_id>.*)", PersonHandler),
             (r"/persons/photo-search", PhotoSearchHandler),
             (r"/persons/encoding-search", EncodingSearchHandler),
-            (r"/persons/(?P<person_id>\w+)/faces/(?P<face_id>\w+)", FaceHandler),
-            (r"/persons/(?P<person_id>\w+)/faces", FaceHandler),
+            (r"/persons", PersonCollectionHandler),
             (r"/faces", FaceCollectionHandler),
             (r"/encode", AdHocEncodingHandler),
         ]
@@ -47,7 +52,7 @@ class SurroundHandler(tornado.web.RequestHandler):
             else:
                 self.json_body = dict()
         else:
-            self.json_body = None
+            self.json_body = dict()
 
     def write_error(self, status_code, **kwargs):
         self.set_header("Content-Type", "application/json")
@@ -109,49 +114,93 @@ class InfoHandler(SurroundHandler):
 class PersonCollectionHandler(SurroundHandler):
     def get(self):
         name = self.get_query_argument("name", None)
+        people = []
         if name is not None:
-            self.write("Get persons named " + name)
+            people = POSTGRES_CLIENT.find_persons_by_name(name)
         else:
-            self.write("Get all persons")
+            people = POSTGRES_CLIENT.find_all_persons()
+
+        self.write(json_encode([person.__dict__ for person in people]))
 
     def post(self):
-        self.write("Create new person")
+        try:
+            person = Person(id=None, name=self.json_body["name"])
+        except KeyError as e:
+            raise SurroundWebError(reason="Missing field: " + str(e), status_code=400)
+
+        result = POSTGRES_CLIENT.create_person(person)
+        self.set_status(201)
+        self.write(json_encode(result.__dict__))
 
     def delete(self):
-        self.write("Delete all persons")
+        POSTGRES_CLIENT.delete_all_persons()
+        self.set_status(200)
 
 
 class PersonHandler(SurroundHandler):
+    def _person_uuid(self, person_id):
+        try:
+            return uuid.UUID(person_id)
+        except ValueError as e:
+            raise SurroundWebError(reason=str(e), status_code=400)
+
     def get(self, person_id):
-        self.write("Get person {}".format(person_id))
+        result = POSTGRES_CLIENT.find_person_by_id(self._person_uuid(person_id))
+        self.write(json_encode(result.__dict__))
 
     def delete(self, person_id):
-        self.write("Delete person " + person_id)
+        POSTGRES_CLIENT.delete_person_by_id(self._person_uuid(person_id))
+        self.set_status(200)
 
 
 class FaceCollectionHandler(SurroundHandler):
     def get(self):
-        self.write("Get all faces")
+        faces = POSTGRES_CLIENT.find_all_faces()
+        self.write(json_encode([face.serializable() for face in faces]))
 
-    def delete(self, person_id=None, face_id=None):
-        self.write("Delete all faces")
+    def delete(self):
+        POSTGRES_CLIENT.delete_all_faces()
+        self.set_status(200)
 
 
 class FaceHandler(SurroundHandler):
     def get(self, person_id, face_id=None):
+        faces = []
         if face_id is not None:
-            self.write("Get face {} for person {}".format(face_id, person_id))
+            face = POSTGRES_CLIENT.find_person_face(person_id, face_id)
+            self.write(json_encode(face.serializable()))
         else:
-            self.write("Get all faces for person {}".format(person_id))
+            faces = POSTGRES_CLIENT.find_person_faces(person_id)
+            self.write(json_encode([face.serializable() for face in faces]))
 
     def post(self, person_id):
-        self.write("Create new face for person {}".format(person_id))
+        try:
+            # @TODO: Photo upload --> Surround pipeline
+            face = Face(
+                id=None,
+                person_id=person_id,
+                encoding=Face.dummy_encoding(),
+                photo_md5=hashlib.md5(str(uuid.uuid4()).encode("utf-8")).hexdigest(),
+                photo_filename="dummy.jpg",
+                box_x1=1,
+                box_x2=2,
+                box_y1=3,
+                box_y2=4,
+                encoder_version="v1",
+                encoder_batch_id=uuid.uuid4()
+            )
+        except KeyError as e:
+            raise SurroundWebError(reason="Missing field: " + str(e), status_code=400)
+
+        result = POSTGRES_CLIENT.create_face_for_person(person_id, face)
+        self.set_status(201)
+        self.write(json_encode(result.serializable()))
 
     def delete(self, person_id, face_id=None):
         if face_id is not None:
-            self.write("Delete face {} for person {}".format(face_id, person_id))
+            POSTGRES_CLIENT.delete_face_for_person(person_id, face_id)
         else:
-            self.write("Delete all faces for person {}".format(person_id))
+            POSTGRES_CLIENT.delete_faces_for_person(person_id)
 
 
 class SearchHandler(SurroundHandler):
@@ -187,4 +236,19 @@ class EncodingSearchHandler(SearchHandler):
 
 class AdHocEncodingHandler(SurroundHandler):
     def post(self):
-        self.write("Encode a photo")
+        # @TODO: Photo upload --> Surround pipeline
+        face = Face(
+            id=None,
+            person_id=None,
+            encoding=Face.dummy_encoding(),
+            photo_md5=hashlib.md5(str(uuid.uuid4()).encode("utf-8")).hexdigest(),
+            photo_filename="dummy.jpg",
+            box_x1=1,
+            box_x2=2,
+            box_y1=3,
+            box_y2=4,
+            encoder_version="v1",
+            encoder_batch_id=uuid.uuid4()
+        )
+
+        self.write(json_encode(face.serializable()))
