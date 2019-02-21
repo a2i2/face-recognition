@@ -20,6 +20,7 @@ class PipelineData(SurroundData):
     image_array = None            # Numpy array of the image stored in BGR format
     image_rgb_array = None        # Image in RGB format
     image_filename = None         # File name of the image
+    image_bytes = None            # Image bytes. If this is populated, the PhotoExtraction stage will load from here rather than image_filename.
     image_exif = None             # Exif data for the image
     image_grayscale = None        # Grayscale version of the image
     face_bounding_boxes = list()  # List of tuples, (x1, y1, x2, y2) bounding boxes for faces found in the image
@@ -28,20 +29,22 @@ class PipelineData(SurroundData):
     face_encodings = list()       # List of 128 floats representing a face encoding
     output_data = dict(photoFilename=image_filename)
 
-    def __init__(self, image_filename):
+    def __init__(self, image_filename, image_bytes=None):
         self.image_filename = image_filename
-        self.output_data['photoFilename'] = image_filename
+        self.image_bytes = image_bytes
+        self.output_data["photoFilename"] = image_filename
 
 
 class PhotoExtraction(Stage):
     def operate(self, surround_data, config):
-        try:
-            image_bytes = open(surround_data.image_filename, "rb").read()
-        except:
-            surround_data.error = dict(error="No such image file")
-            return
+        if surround_data.image_bytes is None:
+            try:
+                surround_data.image_bytes = open(surround_data.image_filename, "rb").read()
+            except:
+                surround_data.error = dict(error="No such image file")
+                return
 
-        numpy_image = cv2.imdecode(np.fromstring(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        numpy_image = cv2.imdecode(np.fromstring(surround_data.image_bytes, np.uint8), cv2.IMREAD_COLOR)
         if numpy_image is None:
             surround_data.error = dict(error="Error decoding image")
             return
@@ -355,17 +358,16 @@ class ExtractEncodingsResNet1(Stage):
             images = np.zeros((len(surround_data.face_filtered_boxes), image_size, image_size, 3))
 
             for i, face in enumerate(surround_data.face_filtered_boxes):
-
                 # Crop and resize image
                 image = surround_data.image_array[face[1]:face[3], face[0]:face[2]]
                 resized = cv2.resize(image, (image_size, image_size), interpolation = cv2.INTER_LINEAR)
                 self.resized_images.append(resized)
                 images[i,:,:,:] = self.prewhiten(resized)
 
-                # Extract encodings
+            # Extract encodings
             feed_dict = {self.images_placeholder:images, self.phase_train_placeholder:False }
             face_encodings = self.sess.run(self.embeddings, feed_dict=feed_dict)
-            surround_data.output_data["faceEncodings"] = face_encodings[0].tolist()
+            surround_data.face_encodings = face_encodings.tolist()
         else:
             surround_data.error = { "error": "NO_MODEL_ENCODING"}
             return

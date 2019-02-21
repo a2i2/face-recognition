@@ -1,16 +1,26 @@
 import datetime
 import traceback
+import os
 import json
 import uuid
 import hashlib
 import tornado.web
+import psycopg2
 from tornado.escape import json_encode, json_decode
 from .db import PostgresClient
 from .entities import Person, Face
+from .stages import *
+from surround import Surround, Config
 
 
 START_TIME = datetime.datetime.now()
 POSTGRES_CLIENT = PostgresClient("face_recognition", "postgres", "localhost", 5432, "postgres")
+SURROUND = Surround([PhotoExtraction(), DownsampleImage(), RotateImage(), ImageTooDark(), DetectAndAlignFaces(), LargestFace(), FaceTooBlurry(), ExtractEncodingsResNet1()])
+CONFIG = Config()
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yaml")
+CONFIG.read_config_files([CONFIG_PATH])
+SURROUND.set_config(CONFIG)
+SURROUND.init_stages()
 
 
 class SurroundWebApplication(tornado.web.Application):
@@ -46,13 +56,10 @@ class SurroundHandler(tornado.web.RequestHandler):
         """
         Parses the request body and populates a json_body variable.
         """
+        self.json_body = dict()
         if self.request.headers.get("Content-Type", "").startswith("application/json"):
             if len(self.request.body) > 0:
                 self.json_body = json_decode(self.request.body.decode("utf-8"))
-            else:
-                self.json_body = dict()
-        else:
-            self.json_body = dict()
 
     def write_error(self, status_code, **kwargs):
         self.set_header("Content-Type", "application/json")
@@ -174,25 +181,39 @@ class FaceHandler(SurroundHandler):
             self.write(json_encode([face.serializable() for face in faces]))
 
     def post(self, person_id):
-        try:
-            # @TODO: Photo upload --> Surround pipeline
-            face = Face(
-                id=None,
-                person_id=person_id,
-                encoding=Face.dummy_encoding(),
-                photo_md5=hashlib.md5(str(uuid.uuid4()).encode("utf-8")).hexdigest(),
-                photo_filename="dummy.jpg",
-                box_x1=1,
-                box_x2=2,
-                box_y1=3,
-                box_y2=4,
-                encoder_version="v1",
-                encoder_batch_id=uuid.uuid4()
-            )
-        except KeyError as e:
-            raise SurroundWebError(reason="Missing field: " + str(e), status_code=400)
+        file_info = self.request.files["file"][0]
+        filename = file_info["filename"]
+        extension = os.path.splitext(filename[1])
 
-        result = POSTGRES_CLIENT.create_face_for_person(person_id, face)
+        data = PipelineData(image_filename=filename, image_bytes=file_info["body"])
+        SURROUND.process(data)
+
+        if data.error is not None:
+            raise SurroundWebError(reason=str(data.error["error"]), status_code=400)
+        if len(data.face_encodings) == 0:
+            raise SurroundWebError(reason="No face found", status_code=400)
+        if len(data.face_encodings) > 1:
+            raise SurroundWebError(reason="More than one face in registration photo", status_code=400)
+
+        face = Face(
+            id=None,
+            person_id=person_id,
+            encoding=data.face_encodings[0],
+            photo_md5=hashlib.md5(file_info["body"]).hexdigest(),
+            photo_filename=filename,
+            box_x1=data.face_filtered_boxes[0][0],
+            box_x2=data.face_filtered_boxes[0][2],
+            box_y1=data.face_filtered_boxes[0][1],
+            box_y2=data.face_filtered_boxes[0][3],
+            encoder_version="v1",
+            encoder_batch_id=uuid.uuid4()
+        )
+
+        try:
+            result = POSTGRES_CLIENT.create_face_for_person(person_id, face)
+        except psycopg2.IntegrityError:
+            raise SurroundWebError(reason="Person already has an identical face encoding", status_code=400)
+
         self.set_status(201)
         self.write(json_encode(result.serializable()))
 
