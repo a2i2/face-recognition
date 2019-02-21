@@ -12,6 +12,8 @@ from .entities import Person, Face
 
 logging.basicConfig(level=logging.INFO)
 
+LOGGER = logging.getLogger(__name__)
+
 class NotFoundException(Exception):
     pass
 
@@ -27,17 +29,17 @@ class PostgresClient:
         self.retry_time = 5
 
     def connect(self):
-        logging.info("Connecting to db: {}, user: {}, host: {}, port: {}".format(self.dbname, self.user, self.host, self.port))
+        LOGGER.info("Connecting to db: {}, user: {}, host: {}, port: {}".format(self.dbname, self.user, self.host, self.port))
         self.close()
 
         while not self.postgres:
             try:
                 self.postgres = psycopg2.connect(dbname=self.dbname, user=self.user, host=self.host, port=self.port, password=self.password, cursor_factory=psycopg2.extras.NamedTupleCursor)
             except Exception as e:
-                logging.exception(e)
+                LOGGER.exception(e)
 
             if not self.postgres:
-                logging.info("Failed to connect to Postgres, trying again in %d second(s)", self.retry_time)
+                LOGGER.info("Failed to connect to Postgres, trying again in %d second(s)", self.retry_time)
                 time.sleep(self.retry_time)
 
         return self.postgres
@@ -86,8 +88,8 @@ class PostgresClient:
         faces = []
         for result in results:
             faces.append(Face(
-                id=result.id,
-                person_id=result.person_id,
+                id=uuid.UUID(result.id),
+                person_id=uuid.UUID(result.person_id),
                 encoding=self.base64_decode_double_array(result.encoding),
                 photo_md5=result.photo_md5,
                 photo_filename=result.photo_filename,
@@ -96,7 +98,7 @@ class PostgresClient:
                 box_y1=result.box_y1,
                 box_y2=result.box_y2,
                 encoder_version=result.encoder_version,
-                encoder_batch_id=result.encoder_batch_id
+                encoder_batch_id=uuid.UUID(result.encoder_batch_id)
             )
         )
 
@@ -121,6 +123,16 @@ class PostgresClient:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT * FROM person WHERE id = %s", (str(id),))
                 return self._fetch_person(cursor)
+
+    def find_persons_by_ids(self, id_list):
+        str_ids = []
+        for id in id_list:
+            assert isinstance(id, uuid.UUID)
+            str_ids.append(str(id))
+        with self.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM person WHERE id IN (%s)", (",".join(str_ids),))
+                return self._fetch_persons(cursor)
 
     def find_persons_by_name(self, name):
         assert isinstance(name, str)

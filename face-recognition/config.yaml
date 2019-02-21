@@ -2,7 +2,7 @@ pathToModels: ../models
 model: hog                                                       # 'hog' or 'cnn'
 minFaceWidth: 100                                                # Threshold for the width of a face bounding box in pixels
 minFaceHeight: 125                                               # Threshold for the height of a face bounding box in pixels
-useAllFaces: false                                               # If false, only extract encodings for the largest face
+useAllFaces: true                                                # If false, only extract encodings for the largest face
 imageTooDark: 23                                                 # Threshold for determining if an image is too dark, lower values = darker image
 blurryThreshold: 4                                               # Smaller values indicate a "more" blurry image
 gpuDynamicMemoryAllocation: true                                 # If true, Tensorflow will allocate GPU memory on an as-needs basis. perProcessGpuMemoryFraction will have no effect.

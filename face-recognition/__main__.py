@@ -4,7 +4,7 @@ import os
 import json
 from surround import Surround, Config
 from .stages import *
-from .server import SurroundWebApplication
+from .server import FaceRecognitionWebApplication
 from tornado.ioloop import IOLoop
 
 # Data Science projects should use logging over print statements:
@@ -95,7 +95,7 @@ def load_data(input_dir, output_dir, config_path):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    http_server = SurroundWebApplication(debug=False)
+    http_server = FaceRecognitionWebApplication(debug=False)
     http_server.listen(8888)
 
     logging.info("HTTP server listening on 8888")

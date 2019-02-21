@@ -22,7 +22,7 @@ class Face:
             self.encoder_version = kwargs.get("encoder_version")
             self.encoder_batch_id = kwargs.get("encoder_batch_id")
         except KeyError as e:
-            raise SurroundWebError(reason="Missing field: " + str(e), status_code=400)
+            raise FaceRecognitionError(reason="Missing field: " + str(e), status_code=400)
 
     @staticmethod
     def dummy_encoding():
