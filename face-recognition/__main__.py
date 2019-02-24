@@ -5,6 +5,7 @@ import json
 from surround import Surround, Config
 from .stages import *
 from .server import FaceRecognitionWebApplication
+from .webcam_tcp_server import WebcamServer
 from tornado.ioloop import IOLoop
 
 # Data Science projects should use logging over print statements:
@@ -97,6 +98,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     http_server = FaceRecognitionWebApplication(debug=False)
     http_server.listen(8888)
+    webcam_server = WebcamServer()
+    webcam_server.listen(8889)
 
     logging.info("HTTP server listening on 8888")
     IOLoop.instance().start()
