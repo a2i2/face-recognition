@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 LOGGER = logging.getLogger(__name__)
 
-class NotFoundException(Exception):
+class NotFoundError(Exception):
     pass
 
 
