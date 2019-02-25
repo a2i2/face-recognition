@@ -16,3 +16,9 @@ rotateImageInputWidth: 100                                       # Input image w
 rotateImageThreshold: 0.5                                        # Rotate image if the orientation is above this threshold
 rotateImageSkip: false                                           # Option to skip image rotation step
 imageSizeMax: 700
+postgres:
+  user: postgres
+  password: postgres
+  host: localhost
+  port: 5432
+  db: face_recognition

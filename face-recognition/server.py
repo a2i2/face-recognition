@@ -15,13 +15,17 @@ from .stages import *
 from surround import Surround, Config
 from .utils import distance
 
-
+# Get time for uptime calculation.
 START_TIME = datetime.datetime.now()
-POSTGRES_CLIENT = PostgresClient("face_recognition", "postgres", "localhost", 5432, "postgres")
-SURROUND = Surround([PhotoExtraction(), DownsampleImage(), RotateImage(), ImageTooDark(), DetectAndAlignFaces(), LargestFace(), FaceTooBlurry(), ExtractEncodingsResNet1()])
+
+# Load config file.
 CONFIG = Config()
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yaml")
 CONFIG.read_config_files([CONFIG_PATH])
+
+POSTGRES_CLIENT = PostgresClient(CONFIG["postgres"]["db"], CONFIG["postgres"]["user"], CONFIG["postgres"]["host"], CONFIG["postgres"]["port"], CONFIG["postgres"]["password"])
+
+SURROUND = Surround([PhotoExtraction(), DownsampleImage(), RotateImage(), ImageTooDark(), DetectAndAlignFaces(), LargestFace(), FaceTooBlurry(), ExtractEncodingsResNet1()])
 SURROUND.set_config(CONFIG)
 SURROUND.init_stages()
 
