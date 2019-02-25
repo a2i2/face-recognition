@@ -114,6 +114,7 @@ class InfoHandler(FaceRecognitionWebHandler):
             dict(request="DELETE /persons/:id/faces/:id",           description="Delete a face for a person"),
             dict(request="DELETE /persons/:id/faces",               description="Delete all faces for a person"),
             dict(request="DELETE /persons",                         description="Delete all persons"),
+            dict(request="DELETE /persons/:id",                     description="Delete a person by ID"),
             dict(request="POST /persons/photo-search",              description="Search for a person using a photo"),
             dict(request="POST /persons/photo-search?nearest=N",    description="Get a list of the nearest people (in order of confidence) using a photo, up to a maximum of N people"),
             dict(request="POST /persons/encoding-search",           description="Search for a person using an encoding"),
