@@ -13,7 +13,7 @@ from .postgres_client import PostgresClient
 from .entities import Person, Face
 from .stages import face_recognition_pipeline, FaceRecognitionPipelineData
 from surround import Surround, Config
-from .utils import distance, to_json
+from .utils import distance
 
 # Get time for uptime calculation.
 START_TIME = datetime.datetime.now()
