@@ -14,7 +14,8 @@ import tornado.ioloop
 
 class WebcamServer(TCPServer):
     """
-    This is a simple echo TCP Server
+    Provides a TCP server that will send webcam frames to all connected
+    clients on a best-effort basis.
     """
     message_separator = b'\r\n'
 
@@ -33,7 +34,7 @@ class WebcamServer(TCPServer):
     @gen.coroutine
     def handle_stream(self, stream, address):
         """
-        Main connection loop. Launches listen on given channel and keeps
+        Main connection loop. Launches listen on the given channel and keeps
         reading data from socket until it is closed.
         """
         try:

@@ -8,12 +8,12 @@ import queue
 import tornado.web
 import psycopg2
 import operator
-from tornado.escape import json_encode, json_decode
-from .db import PostgresClient
+from tornado.escape import json_decode
+from .postgres_client import PostgresClient
 from .entities import Person, Face
-from .stages import *
+from .stages import face_recognition_pipeline, FaceRecognitionPipelineData
 from surround import Surround, Config
-from .utils import distance
+from .utils import distance, to_json
 
 # Get time for uptime calculation.
 START_TIME = datetime.datetime.now()
@@ -23,17 +23,19 @@ CONFIG = Config()
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yaml")
 CONFIG.read_config_files([CONFIG_PATH])
 
+# Create PostgreSQL client.
 POSTGRES_CLIENT = PostgresClient(CONFIG["postgres"]["db"], CONFIG["postgres"]["user"], CONFIG["postgres"]["host"], CONFIG["postgres"]["port"], CONFIG["postgres"]["password"])
 
-SURROUND = Surround([PhotoExtraction(), DownsampleImage(), RotateImage(), ImageTooDark(), DetectAndAlignFaces(), LargestFace(), FaceTooBlurry(), ExtractEncodingsResNet1()])
-SURROUND.set_config(CONFIG)
-SURROUND.init_stages()
+# Create face recognition pipeline.
+FACE_RECOGNITION_PIPELINE = face_recognition_pipeline()
+FACE_RECOGNITION_PIPELINE.set_config(CONFIG)
+FACE_RECOGNITION_PIPELINE.init_stages()
 
 
 class FaceRecognitionWebApplication(tornado.web.Application):
     def __init__(self, **kwargs):
         kwargs["handlers"] = [
-            (r"/", MainHandler),
+            (r"/", HomeHandler),
             (r"/info", InfoHandler),
             (r"/persons/photo-search", PhotoSearchHandler),
             (r"/persons/encoding-search", EncodingSearchHandler),
@@ -70,6 +72,10 @@ class FaceRecognitionWebHandler(tornado.web.RequestHandler):
                 self.json_body = json_decode(self.request.body.decode("utf-8"))
 
     def write_error(self, status_code, **kwargs):
+        """
+        Handles any errors that occur, returning an appropriate
+        JSON response and HTTP status code.
+        """
         self.set_header("Content-Type", "application/json")
         if self.settings.get("debug") and "exc_info" in kwargs:
             # In debug mode, try to send a traceback.
@@ -92,7 +98,10 @@ class FaceRecognitionWebHandler(tornado.web.RequestHandler):
             )
 
 
-class MainHandler(FaceRecognitionWebHandler):
+class HomeHandler(FaceRecognitionWebHandler):
+    """
+    Top-level handler for the root route.
+    """
     def get(self):
         self.write(dict(
             app="A2I2 Face Recognition",
@@ -102,6 +111,10 @@ class MainHandler(FaceRecognitionWebHandler):
 
 
 class InfoHandler(FaceRecognitionWebHandler):
+    """
+    Handler for the /info route. Displays a list of supported endpoints
+    with accompanying descriptions.
+    """
     def get(self):
         routes = dict(routes=[
             dict(request="POST /persons",                           description="Create a person"),
@@ -128,7 +141,11 @@ class InfoHandler(FaceRecognitionWebHandler):
 
 
 class PersonCollectionHandler(FaceRecognitionWebHandler):
+    """
+    Hander for endpoints that deal with the overall Person collection.
+    """
     def get(self):
+        """Finds all people, or a subset thereof according to the given search criteria."""
         name = self.get_query_argument("name", None)
         people = []
         if name is not None:
@@ -136,9 +153,10 @@ class PersonCollectionHandler(FaceRecognitionWebHandler):
         else:
             people = POSTGRES_CLIENT.find_all_persons()
 
-        self.write(json_encode([person.__dict__ for person in people]))
+        self.write(dict(persons=[person.__dict__ for person in people]))
 
     def post(self):
+        """Creates a new person."""
         try:
             person = Person(id=None, name=self.json_body["name"])
         except KeyError as e:
@@ -149,46 +167,63 @@ class PersonCollectionHandler(FaceRecognitionWebHandler):
         self.write(result.__dict__)
 
     def delete(self):
+        """Deletes all people."""
         POSTGRES_CLIENT.delete_all_persons()
         self.set_status(200)
 
 
 class PersonHandler(FaceRecognitionWebHandler):
+    """
+    Hander for endpoints that deal with a specific Person.
+    """
     def _person_uuid(self, person_id):
+        """Parses a UUID string into an actual UUID object."""
         try:
             return uuid.UUID(person_id)
         except ValueError as e:
             raise FaceRecognitionError(reason=str(e), status_code=400)
 
     def get(self, person_id):
+        """Fetches a person with the given ID."""
         result = POSTGRES_CLIENT.find_person_by_id(self._person_uuid(person_id))
         self.write(result.__dict__)
 
     def delete(self, person_id):
+        """Deletes a person with the given ID."""
         POSTGRES_CLIENT.delete_person_by_id(self._person_uuid(person_id))
         self.set_status(200)
 
 
 class FaceCollectionHandler(FaceRecognitionWebHandler):
+    """
+    Hander for endpoints that deal with the overall Face collection.
+    """
     def get(self):
+        """Fetches all faces."""
         faces = POSTGRES_CLIENT.find_all_faces()
-        self.write(json_encode([face.serializable() for face in faces]))
+        self.write(dict(faces=[face.serializable() for face in faces]))
 
     def delete(self):
+        """Deletes all faces."""
         POSTGRES_CLIENT.delete_all_faces()
         self.set_status(200)
 
 
 class PipelineHandler(FaceRecognitionWebHandler):
+    """
+    Base class for handlers that run the face recognition pipeline.
+    """
     def _pipeline_data_from_photo(self):
+        """Returns a FaceRecognitionPipelineData object loaded from an uploaded file."""
         try:
             file_info = self.request.files["file"][0]
         except KeyError:
             raise FaceRecognitionError(reason="No file uploaded via 'file' form-data field")
-        return PipelineData(image_filename=file_info["filename"], image_bytes=file_info["body"])
+        return FaceRecognitionPipelineData(image_filename=file_info["filename"], image_bytes=file_info["body"])
 
     def _run_pipeline(self, data, single_face=True):
-        SURROUND.process(data)
+        """Runs the face recognition pipeline on uploaded image data."""
+        FACE_RECOGNITION_PIPELINE.process(data)
 
         if data.error is not None:
             raise FaceRecognitionError(reason=str(data.error["error"]), status_code=400)
@@ -220,16 +255,21 @@ class PipelineHandler(FaceRecognitionWebHandler):
 
 
 class FaceHandler(PipelineHandler):
+    """
+    Handler for endpoints that deal with faces for a given person.
+    """
     def get(self, person_id, face_id=None):
+        """Finds one or all faces for the given person."""
         faces = []
         if face_id is not None:
             face = POSTGRES_CLIENT.find_person_face(person_id, face_id)
             self.write(face.serializable())
         else:
             faces = POSTGRES_CLIENT.find_person_faces(person_id)
-            self.write(json_encode([face.serializable() for face in faces]))
+            self.write(dict(faces=[face.serializable() for face in faces]))
 
     def post(self, person_id):
+        """Uploads and processes a new face for the given person."""
         data = self._pipeline_data_from_photo()
         face = self._run_pipeline(data, single_face=True)
         face.person_id = person_id
@@ -243,6 +283,7 @@ class FaceHandler(PipelineHandler):
         self.write(result.serializable())
 
     def delete(self, person_id, face_id=None):
+        """Deletes one or all faces for the given person."""
         if face_id is not None:
             POSTGRES_CLIENT.delete_face_for_person(person_id, face_id)
         else:
@@ -250,7 +291,12 @@ class FaceHandler(PipelineHandler):
 
 
 class SearchHandler(PipelineHandler):
+    """
+    Base class for handlers that will search for similar faces to a given
+    photo or encoding.
+    """
     def prepare(self):
+        """Processes query parameters that control how many results are returned."""
         super().prepare()
         nearest = self.get_query_argument("nearest", None)
         if nearest is not None:
@@ -264,6 +310,7 @@ class SearchHandler(PipelineHandler):
         self.nearest = nearest
 
     def _closest_people(self, encoding, limit=None):
+        """Searches for people with faces similar to the given encoding."""
         # @TODO: Naive approach used here for v1. Will need optimising for scale.
         # Suggest adding the concept of 'groups' to limit the search space.
         all_faces = POSTGRES_CLIENT.find_all_faces()
@@ -284,7 +331,11 @@ class SearchHandler(PipelineHandler):
 
 
 class PhotoSearchHandler(SearchHandler):
+    """
+    Handler for searches that use a photo as input.
+    """
     def post(self):
+        """Runs an uploaded image through the pipeline and returns the N closest people."""
         data = self._pipeline_data_from_photo()
         face = self._run_pipeline(data, single_face=True)
 
@@ -297,7 +348,11 @@ class PhotoSearchHandler(SearchHandler):
 
 
 class EncodingSearchHandler(SearchHandler):
+    """
+    Handler for searches that use an encoding as input.
+    """
     def post(self):
+        """Returns the N closest people with faces similar to the provided encoding."""
         try:
             encoding = self.json_body["encoding"]
         except KeyError as e:
@@ -315,6 +370,9 @@ class EncodingSearchHandler(SearchHandler):
 
 
 class AdHocEncodingHandler(PipelineHandler):
+    """
+    Handler for producing face encodings from photos on an ad-hoc basis.
+    """
     def post(self):
         data = self._pipeline_data_from_photo()
         face = self._run_pipeline(data, single_face=True)

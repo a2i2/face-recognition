@@ -15,10 +15,14 @@ rotateImageInputHeight: 100                                      # Input image h
 rotateImageInputWidth: 100                                       # Input image width to the image stage neural network
 rotateImageThreshold: 0.5                                        # Rotate image if the orientation is above this threshold
 rotateImageSkip: false                                           # Option to skip image rotation step
-imageSizeMax: 700
-postgres:
-  user: postgres
-  password: postgres
-  host: localhost
-  port: 5432
-  db: face_recognition
+imageSizeMax: 700                                                # Maximum allowable image size (width or height). Images larger than this will be downsized.
+postgres:                                                        # Postgres database options
+  user: postgres                                                 #   Postgres username
+  password: postgres                                             #   Postgres password
+  host: localhost                                                #   Postgres server host
+  port: 5432                                                     #   Postgres server port
+  db: face_recognition                                           #   Which database to connect to
+webcamStream:                                                    # Webcam stream options
+  drawBox: true                                                  #   Whether to draw a box around detected faces
+  minConfidence: 0.5                                             #   Discard detections below this confidence level
+  highConfidence: 0.9                                            #   Confidence values at or above this level are deemed to be 'highly confident'

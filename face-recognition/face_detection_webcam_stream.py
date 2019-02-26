@@ -2,59 +2,79 @@ from imutils.video import WebcamVideoStream
 import cv2
 import numpy as np
 import os
+from surround import Config
+
+
+# Load config file.
+CONFIG = Config()
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.yaml")
+CONFIG.read_config_files([CONFIG_PATH])
+
 
 class FaceDetectionWebcamStream(WebcamVideoStream):
-
+	"""
+	Starts a separate thread to capture frames from the webcam,
+	performs per-frame face detection, and stores latest frame along with
+	a bounding box.
+	"""
 	def __init__(self, src=0, name="FaceDetectionWebcamStream"):
 		super().__init__(src, name)
+		self.grabbed = False
+		self.boxes = []
 		self.net = cv2.dnn.readNetFromCaffe(
 			os.path.dirname(os.path.realpath(__file__)) + "/../models/deploy.prototxt.txt",
 			os.path.dirname(os.path.realpath(__file__)) + "/../models/res10_300x300_ssd_iter_140000.caffemodel")
 
 	def update(self):
-		# keep looping infinitely until the thread is stopped
+		"""
+		Update loop that runs on its own thread to grab frames from the webcam
+		and perform face detection.
+		"""
+		# Keep looping infinitely until the thread is stopped.
 		while True:
-			# if the thread indicator variable is set, stop the thread
 			if self.stopped:
 				return
 
-			# otherwise, read the next frame from the stream
+			# Read the next frame from the stream.
 			(grabbed, frame) = self.stream.read()
 
-			# grab the frame dimensions and convert it to a blob
+			# Grab the frame dimensions and convert it to a blob.
 			(h, w) = frame.shape[:2]
 			blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0,
 				(300, 300), (104.0, 177.0, 123.0))
 
-			# pass the blob through the network and obtain the detections and
-			# predictions
+			# Pass the blob through the network and obtain the detections and predictions.
 			self.net.setInput(blob)
 			detections = self.net.forward()
 
-			# loop over the detections
+			boxes = []
 			for i in range(0, detections.shape[2]):
-				# extract the confidence (i.e., probability) associated with the
-				# prediction
 				confidence = detections[0, 0, i, 2]
 
-				# filter out weak detections by ensuring the `confidence` is
-				# greater than the minimum confidence
-				if confidence < 0.5:
+				# Filter out weak detections.
+				if confidence < CONFIG["webcamStream"]["minConfidence"]:
 					continue
 
-				# compute the (x, y)-coordinates of the bounding box for the
-				# object
+				# Compute the (x, y)-coordinates of the bounding box.
 				box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
 				(startX, startY, endX, endY) = box.astype("int")
+				boxes.append((startX, startY, endX, endY))
 
-				# draw the bounding box of the face along with the associated
-				# probability
-				text = "{:.2f}%".format(confidence * 100)
-				y = startY - 10 if startY - 10 > 10 else startY + 10
-				cv2.rectangle(frame, (startX, startY), (endX, endY),
-					(0, 0, 255), 2)
-				cv2.putText(frame, text, (startX, y),
-					cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
+				if CONFIG["webcamStream"]["drawBox"]:
+					# Draw the bounding box of the face along with the associated probability.
+					text = "{:.2f}%".format(confidence * 100)
+					y = startY - 10 if startY - 10 > 10 else startY + 10
 
+					if confidence >= CONFIG["webcamStream"]["highConfidence"]:
+						colour = (0, 255, 0)
+					else:
+						colour = (0, 0, 255)
+
+					cv2.rectangle(frame, (startX, startY), (endX, endY), colour)
+					cv2.putText(frame, text, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, colour, 2)
+
+			# Update data for clients to consume.
+			# @TODO: Thread safety
 			self.grabbed = grabbed
 			self.frame = frame
+			self.boxes = boxes

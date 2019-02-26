@@ -3,11 +3,19 @@ import numpy
 
 
 class Person:
+    """
+    Represents a 'person' with a name that can be used
+    to map between the face recognition server and
+    a domain-specific application.
+    """
     def __init__(self, id, name):
         self.id = id
         self.name = name
 
 class Face:
+    """
+    Represents a 'face' belonging to a given person.
+    """
     def __init__(self, **kwargs):
         try:
             self.id = kwargs.get("id", None)
@@ -28,11 +36,14 @@ class Face:
     def dummy_encoding():
         return [float(num) for num in numpy.random.uniform(-0.2, 0.2, size=(1, 128))[0]]
 
-    # @TODO: This results in None being serialised as "None" instead of null. Need to override default JSON serialiser.
     def serializable(self):
         entries = self.__dict__
-        entries["id"] = str(entries["id"])
-        entries["person_id"] = str(entries["person_id"])
+        if entries["id"] is not None:
+            entries["id"] = str(entries["id"])
+        if entries["person_id"] is not None:
+            entries["person_id"] = str(entries["person_id"])
+        if entries["encoder_batch_id"] is not None:
+            entries["encoder_batch_id"] = str(entries["encoder_batch_id"])
+
         entries["encoding"] = [float(value) for value in entries["encoding"]]
-        entries["encoder_batch_id"] = str(entries["encoder_batch_id"])
         return entries

@@ -3,106 +3,99 @@ import argparse
 import os
 import json
 from surround import Surround, Config
-from .stages import *
+from .stages import face_recognition_pipeline, FaceRecognitionPipelineData
 from .server import FaceRecognitionWebApplication
 from .webcam_tcp_server import WebcamServer
 from tornado.ioloop import IOLoop
+from .utils import is_valid_dir, is_valid_file, iglob_recursive
 
-# Data Science projects should use logging over print statements:
-#
-#    import logging
-#    logging.info("print to output")
-#
-# This is so that in a production environment the output is written to
-# log files for debugging rather than to standard out where the output
-# is lost.
-# The command below configures the default logger.
+
+# Set up default logging config.
 logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger(__name__)
 
-# Validation functions for the command line parser below
-def is_valid_dir(arg_parser, arg):
-    if not os.path.isdir(arg):
-        arg_parser.error("Invalid directory %s" % arg)
-    else:
-        return arg
 
-def is_valid_file(arg_parser, arg):
-    if not os.path.isfile(arg):
-        arg_parser.error("Invalid file %s" % arg)
-    else:
-        return arg
+def argument_parser():
+    """
+    Sets up the parser for command line arguments.
+    We use a subparser for each 'mode' to divide arguments into mutually inclusive groups.
+    """
+    parser = argparse.ArgumentParser(description="A2I2 Face Recognition")
+    subparsers = parser.add_subparsers(
+        title="Operating modes",
+        description="A2I2 Face Recognition can run in 'server' mode or 'batch' mode.",
+        dest="mode")
+    server = subparsers.add_parser("server", help="Run an HTTP server with REST endpoints for performing face registration/recognition")
+    server.add_argument("-w", "--webcam", help="Run a TCP server alongside the HTTP server that serves a video stream from a local webcam", required=False, action="store_true")
+    batch = subparsers.add_parser("batch", help="Process a directory of image files and produce an encoding for each one")
+    batch.add_argument("-o", "--output-dir", required=True, help="Output directory",
+                                         type=lambda x: is_valid_dir(batch, x))
+    batch.add_argument("-i", "--input-dir", required=True, help="Input directory",
+                                         type=lambda x: is_valid_dir(batch, x))
+    batch.add_argument("-c", "--config-file", required=True, help="Path to config file",
+                                         type=lambda x: is_valid_file(batch, x))
 
-# Set up the parser for command line arguments
-parser = argparse.ArgumentParser(description="The Surround Command Line Interface")
-# parser.add_argument('-o', '--output-dir', required=True, help="Output directory",
-#                                      type=lambda x: is_valid_dir(parser, x))
-#
-# parser.add_argument('-i', '--input-dir', required=True, help="Input directory",
-#                                      type=lambda x: is_valid_dir(parser, x))
-# parser.add_argument('-c', '--config-file', required=True, help="Path to config file",
-#                                      type=lambda x: is_valid_file(parser, x))
+    return parser
 
-def load_data(input_dir, output_dir, config_path):
 
-    # All Surround projects have a Surround class which is responsible
-    # for configurating and running a list of stages.
-    surround = Surround([PhotoExtraction(), DownsampleImage(), RotateImage(), ImageTooDark(), DetectAndAlignFaces(), LargestFace(), FaceTooBlurry(), ExtractEncodingsResNet1()])
-
-    # Config is a dictionary with some utility functions for reading
-    # values in from yaml files. Any value read in from a yaml file
-    # can be overridden with an environment variable with a SURROUND_
-    # prefix and '_' to mark nesting. A yaml file with the following
-    # content:
-    #
-    # output:
-    #   mode: True
-    #
-    # Can be overridden with an environment variable:
-    # SURROUND_OUTPUT_MODE
+def process_image_dir(input_dir, output_dir, config_path):
+    """
+    Processes all image files in the given input_dir and outputs face encodings
+    (or an error) for each one in the given output_dir, using the config file located
+    at config_path.
+    """
+    # Load config from the specified file.
     config = Config()
-
-    # When specifying multiple config files each config file can
-    # override a previous config's values.
     config.read_config_files([config_path])
 
-    surround.set_config(config)
-    surround.init_stages()
+    # Load and initialise the face encoding pipeline.
+    pipeline = face_recognition_pipeline()
+    pipeline.set_config(config)
+    pipeline.init_stages()
 
-    # Surround operates on an instance of SurroundData. In this case
-    # the input data is a string 'data'. See stages.py for more
-    # details. In most projects the input for Surround will be read
-    # from a file stored in the directory input_dir.
-    data = PipelineData(input_dir + "/beyonce.PNG")
+    # Process each image in input_dir.
+    for filename in iglob_recursive(input_dir, "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG"):
+        LOGGER.info("Processing {}...".format(filename))
 
-    # Start running each stage of Surround by passing the data to
-    # each stage in order. The data variable will be updated with the
-    # output of each stage so there is no return value.
-    surround.process(data)
+        # Run the current filename through the pipeline.
+        data = FaceRecognitionPipelineData(filename)
+        pipeline.process(data)
 
-    # Write the output to file
-    with open(os.path.abspath(os.path.join(output_dir, "output.txt")), 'w') as f:
-        f.write(json.dumps(data.output_data))
+        if data.error:
+            # Check and handle any errors.
+            LOGGER.error(str(data.error))
+            output_filename = "{}.error.json".format(os.path.basename(filename))
+            with open(os.path.abspath(os.path.join(output_dir, output_filename)), "w") as output_file:
+                output_file.write(json.dumps(data.error))
+        else:
+            # Write the output to file.
+            output_filename = "{}.encoding.json".format(os.path.basename(filename))
+            with open(os.path.abspath(os.path.join(output_dir, output_filename)), "w") as output_file:
+                output = dict(output=data.output_data, warnings=data.warnings)
+                output_file.write(json.dumps(output))
 
-    # Check and handle any errors
-    if data.error:
-        logging.error("Processing error...")
+            # Log any warnings.
+            for warning in data.warnings:
+                LOGGER.warning(str(warning))
 
-    # Log all warnings from running the pipeline
-    for warn in data.warnings:
-        logging.warn(warn)
-
-    # Log the result to screen
-    logging.info(data.output_data)
 
 if __name__ == "__main__":
+    # Parse command-line arguments.
+    parser = argument_parser()
     args = parser.parse_args()
-    http_server = FaceRecognitionWebApplication(debug=False)
-    http_server.listen(8888)
-    webcam_server = WebcamServer()
-    webcam_server.listen(8889)
 
-    logging.info("HTTP server listening on 8888")
-    IOLoop.instance().start()
-    logging.info("Server has shut down.")
+    # Run pipeline in 'server' or 'batch' mode.
+    if args.mode == "server":
+        http_server = FaceRecognitionWebApplication(debug=False)
+        http_server.listen(8888)
+        logging.info("HTTP server listening on 8888")
 
-    # load_data(args.input_dir, args.output_dir, args.config_file)
+        if args.webcam:
+            webcam_server = WebcamServer()
+            webcam_server.listen(8889)
+            logging.info("Webcam TCP server listening on 8889")
+
+        IOLoop.instance().start()
+        logging.info("Server has shut down.")
+    elif args.mode == "batch":
+        process_image_dir(args.input_dir, args.output_dir, args.config_file)

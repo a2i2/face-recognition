@@ -15,10 +15,16 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 
 class NotFoundError(Exception):
+    """
+    Error that can be raised when a query yields no result.
+    """
     pass
 
 
 class PostgresClient:
+    """
+    Connects to the face recognition database to perform registration and search queries.
+    """
     def __init__(self, dbname, user, host, port, password):
         self.dbname = dbname
         self.user = user
@@ -29,6 +35,7 @@ class PostgresClient:
         self.retry_time = 5
 
     def connect(self):
+        """Provides a connection to the PostgreSQL database."""
         LOGGER.info("Connecting to db: {}, user: {}, host: {}, port: {}".format(self.dbname, self.user, self.host, self.port))
         self.close()
 
@@ -45,11 +52,13 @@ class PostgresClient:
         return self.postgres
 
     def close(self):
+        """Closes the connection to the PostgreSQL database."""
         if self.postgres:
             self.postgres.close()
             self.postgres = None
 
     def _fetch_person(self, cursor):
+        """(internal) Fetches a single Person from the result set."""
         result = cursor.fetchone()
         if result is None:
             raise NotFoundError()
@@ -57,6 +66,7 @@ class PostgresClient:
         return Person(id=result.id, name=result.name)
 
     def _fetch_persons(self, cursor):
+        """(internal) Fetches a list of Persons from the result set."""
         results = cursor.fetchall()
         people = []
         for result in results:
@@ -65,6 +75,7 @@ class PostgresClient:
         return people
 
     def _fetch_face(self, cursor):
+        """(internal) Fetches a single Face from the result set."""
         result = cursor.fetchone()
         if result is None:
             raise NotFoundError()
@@ -84,6 +95,7 @@ class PostgresClient:
         )
 
     def _fetch_faces(self, cursor):
+        """(internal) Fetches a list of Faces from the result set."""
         results = cursor.fetchall()
         faces = []
         for result in results:

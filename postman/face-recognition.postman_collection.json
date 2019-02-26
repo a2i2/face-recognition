@@ -145,6 +145,19 @@
 		},
 		{
 			"name": "Add face to person",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "423b97b7-0e28-445c-9aa7-6403d66b2263",
+						"type": "text/javascript",
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.environment.set(\"face_id\", jsonData.id);"
+						]
+					}
+				}
+			],
 			"request": {
 				"method": "POST",
 				"header": [
@@ -158,7 +171,6 @@
 					"formdata": [
 						{
 							"key": "file",
-							"value": "",
 							"description": "",
 							"type": "file"
 						}

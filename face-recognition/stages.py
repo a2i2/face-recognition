@@ -12,7 +12,23 @@ from surround import Stage, SurroundData, Surround, Config
 LOGGER = logging.getLogger(__name__)
 
 
-class PipelineData(SurroundData):
+def face_recognition_pipeline():
+    """
+    Returns the stages that form part of the face recognition pipeline.
+    """
+    return Surround([
+        DecodeImage(),
+        DownsampleImage(),
+        RotateImage(),
+        ImageTooDark(),
+        DetectAndAlignFaces(),
+        LargestFace(),
+        FaceTooBlurry(),
+        ExtractFaceEncodings()
+    ])
+
+
+class FaceRecognitionPipelineData(SurroundData):
     """
     Stores the data to be passed between each stage of a pipeline. Note that different stages of the pipeline are
     responsible for setting the attributes.
@@ -20,7 +36,7 @@ class PipelineData(SurroundData):
     image_array = None            # Numpy array of the image stored in BGR format
     image_rgb_array = None        # Image in RGB format
     image_filename = None         # File name of the image
-    image_bytes = None            # Image bytes. If this is populated, the PhotoExtraction stage will load from here rather than image_filename.
+    image_bytes = None            # Image bytes. If this is populated, the DecodeImage stage will load from here rather than image_filename.
     image_exif = None             # Exif data for the image
     image_grayscale = None        # Grayscale version of the image
     face_bounding_boxes = list()  # List of tuples, (x1, y1, x2, y2) bounding boxes for faces found in the image
@@ -35,7 +51,11 @@ class PipelineData(SurroundData):
         self.output_data["photoFilename"] = image_filename
 
 
-class PhotoExtraction(Stage):
+class DecodeImage(Stage):
+    """
+    Loads image data from the provided bytes or file path
+    and decodes it into into a numpy array for input to the rest of the pipeline.
+    """
     def operate(self, surround_data, config):
         if surround_data.image_bytes is None:
             try:
@@ -54,6 +74,9 @@ class PhotoExtraction(Stage):
 
 
 class DownsampleImage(Stage):
+    """
+    Downsamples the image if it is larger than the configured width/height limit.
+    """
     def operate(self, surround_data, config):
         max_size = config["imageSizeMax"]
         image = surround_data.image_array
@@ -79,16 +102,20 @@ class DownsampleImage(Stage):
 
 
 class RotateImage(Stage):
+    """
+    Detects the orientation of the image and rotates it if necessary. Combats issues
+    that arise when EXIF orientation data is missing.
+    """
     rotation_angles = dict(
         upright=0,
         left=270,
         upsidedown=180,
-        right=90
-    )
+        right=90)
 
     def normalise(self, image, config):
         input_height = config["rotateImageInputHeight"]
         input_width = config["rotateImageInputWidth"]
+
         with tf.Graph().as_default():
             # Convert OpenCV Numpy array to a Tensorflow tensor
             # Note that there is a slight error between an OpenCV decoded image and a Tensorflow decoded image.
@@ -98,13 +125,14 @@ class RotateImage(Stage):
             normalized = tf.multiply(resized, 1./255)
             sess = tf.Session()
             result = sess.run(normalized)
+
         return result
 
     def load_labels(self, label_file):
         label = []
         proto_as_ascii_lines = tf.gfile.GFile(label_file).readlines()
-        for l in proto_as_ascii_lines:
-            label.append(l.rstrip())
+        for line in proto_as_ascii_lines:
+            label.append(line.rstrip())
         return label
 
     def init_stage(self, config):
@@ -124,32 +152,35 @@ class RotateImage(Stage):
                  tf.import_graph_def(graph_def)
             self.session = tf.Session(graph=self.graph)
 
-    def rotate_and_scale(self, img, scaleFactor = 1, degreesCCW = 30):
+    def rotate_and_scale(self, image, scale_factor=1, degrees_ccw=30):
         """
         Rotate and scale an image without transposing the matrix. The CNN requires an image to be in a certain
         format so transposed images need to be preprocessed again before being passed to the network.
         """
-        (oldY,oldX, _) = img.shape
-        M = cv2.getRotationMatrix2D(center=(oldX/2,oldY/2), angle=degreesCCW, scale=scaleFactor) #rotate about center of image.
+        (old_y, old_x, _) = image.shape
 
-        #choose a new image size.
-        newX,newY = oldX*scaleFactor,oldY*scaleFactor
-        #include this if you want to prevent corners being cut off
-        r = np.deg2rad(degreesCCW)
-        newX,newY = (abs(np.sin(r)*newY) + abs(np.cos(r)*newX),abs(np.sin(r)*newX) + abs(np.cos(r)*newY))
+        # Rotate about center of image.
+        rotation_matrix = cv2.getRotationMatrix2D(center=(old_x/2, old_y/2), angle=degrees_ccw, scale=scale_factor)
 
-        #So I will find the translation that moves the result to the center of that region.
-        (tx,ty) = ((newX-oldX)/2,(newY-oldY)/2)
-        M[0,2] += tx #third column of matrix holds translation, which takes effect after rotation.
-        M[1,2] += ty
+        # Choose a new image size.
+        new_x, new_y = old_x * scale_factor, old_y * scale_factor
 
-        rotatedImg = cv2.warpAffine(img, M, dsize=(int(newX),int(newY)))
+        # Prevent corners being cut off.
+        r = np.deg2rad(degrees_ccw)
+        new_x,new_y = (abs(np.sin(r)*new_y) + abs(np.cos(r)*new_x),abs(np.sin(r)*new_x) + abs(np.cos(r)*new_y))
+
+        # Find the translation that moves the result to the center of that region.
+        (tx, ty) = ((new_x - old_x) / 2, (new_y - old_y) / 2)
+
+        rotation_matrix[0,2] += tx  # Third column of matrix holds translation, which takes effect after rotation.
+        rotation_matrix[1,2] += ty
+
+        rotatedImg = cv2.warpAffine(image, rotation_matrix, dsize=(int(new_x),int(new_y)))
         return rotatedImg
 
     def operate(self, surround_data, config):
         if config["rotateImageSkip"]:
             return
-
 
         if self.has_model:
             input_name = "import/" + config["rotateImageInputLayer"]
@@ -160,8 +191,8 @@ class RotateImage(Stage):
             output_operation = self.graph.get_operation_by_name(output_name)
 
             self.results = self.session.run(output_operation.outputs[0], {
-                    input_operation.outputs[0]: normalised_image
-                })
+                input_operation.outputs[0]: normalised_image
+            })
             self.results = np.squeeze(self.results)
             self.top = self.results.argsort()
             index = self.top[-1]
@@ -171,17 +202,21 @@ class RotateImage(Stage):
                 angle = self.rotation_angles[label]
 
                 if not label == "upright":
-                    surround_data.image_array = self.rotate_and_scale(surround_data.image_array, degreesCCW=angle)
+                    surround_data.image_array = self.rotate_and_scale(surround_data.image_array, degrees_ccw=angle)
                     surround_data.image_rgb_array = surround_data.image_array[...,::-1]
                     surround_data.warnings.append("IMAGE_ROTATED")
             else:
                 surround_data.warnings.append("IMAGE_ROTATION_UNDEFINED")
         else:
-            surround_data.error = { "error": "NO MODEL ROTATION"}
+            surround_data.error = dict(error="NO_MODEL_FOR_FACE_ROTATION")
             return
 
 
 class ImageTooDark(Stage):
+    """
+    Analyses the image and produces a warning if it is deemed
+    to be too dark to produce an accurate face encoding.
+    """
     def operate(self, surround_data, config):
         self.darkness_values = list()
         surround_data.image_grayscale = cv2.cvtColor(surround_data.image_array, cv2.COLOR_BGR2GRAY)
@@ -192,15 +227,15 @@ class ImageTooDark(Stage):
 
 
 class DetectAndAlignFaces(Stage):
+    """
+    Detects faces in the image and produces a bounding box for each.
+    """
     def init_stage(self, config):
         with tf.Graph().as_default():
             # Configure GPU settings.
-            # @TODO: Support loading full GPU options dict from config.
             if config["gpuDynamicMemoryAllocation"]:
-                LOGGER.info("Tensorflow will use dynamic GPU memory allocation.")
                 gpu_options = tf.GPUOptions(allow_growth=True)
             else:
-                LOGGER.info("Tensorflow will use preconfigured GPU memory fraction of {}".format(config["perProcessGpuMemoryFraction"]))
                 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=config["perProcessGpuMemoryFraction"])
 
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
@@ -216,7 +251,7 @@ class DetectAndAlignFaces(Stage):
 
     def look_for_faces(self, image, config):
         """
-        Use the Multi-task CNN to find and align faces in `image`
+        Use the Multi-task CNN to find and align faces in the given image.
         """
         minWidth = config["minFaceWidth"]
         minHeight = config["minFaceHeight"]
@@ -225,7 +260,7 @@ class DetectAndAlignFaces(Stage):
         threshold = [ 0.6, 0.7, 0.7 ]  # three steps's threshold
         factor = 0.709 # scale factor
 
-        # @TODO: Parametise the image size embedded in Facenet
+        # @TODO: Parameterise the image size embedded in Facenet
         boxes, points = detect_face(image, minsize, self.pnet, self.rnet, self.onet, threshold, factor)
 
         bounding_boxes = []
@@ -235,22 +270,26 @@ class DetectAndAlignFaces(Stage):
         return bounding_boxes
 
     def operate(self, surround_data, config):
-        assert not self.pnet is None and not self.rnet is None and not self.onet is None, "NN not setup correctly"
+        assert not self.pnet is None and not self.rnet is None and not self.onet is None, "NN not set up correctly"
         if self.has_model:
             bounding_boxes = self.look_for_faces(surround_data.image_rgb_array, config)
             surround_data.face_bounding_boxes = bounding_boxes
         else:
-            surround_data.error = { "error": "NO_MODEL_FACE_DETECTOR"}
+            surround_data.error = dict(error="NO_MODEL_FOR_FACE_DETECTION")
             return
 
 
 class LargestFace(Stage):
+    """
+    If configured to do so, filter the output data to only consider
+    the largest face.
+    """
     def operate(self, surround_data, config):
         max_area = 0
         faces = list()
         a_face_too_small = False
         if len(surround_data.face_bounding_boxes) == 0:
-            surround_data.error = { "error": "FACE_NOT_FOUND"}
+            surround_data.error = dict(error="FACE_NOT_FOUND")
             return
         else:
             for i, box in enumerate(surround_data.face_bounding_boxes):
@@ -290,7 +329,11 @@ class LargestFace(Stage):
             new_value = value
         return new_value
 
+
 class FaceTooBlurry(Stage):
+    """
+    Raise a warning if the face is deemed to be too blurry.
+    """
     def operate(self, surround_data, config):
         blurry_face_found = False
         at_least_one_face_in_focus = False
@@ -308,8 +351,13 @@ class FaceTooBlurry(Stage):
         if not at_least_one_face_in_focus and blurry_face_found:
             surround_data.warnings.append("FACE_TOO_BLURRY")
 
-class ExtractEncodingsResNet1(Stage):
 
+class ExtractFaceEncodings(Stage):
+    """
+    Extracts a face encoding for each detected face in the image.
+    This encoding can be compared with other encodings using a euclidean distance measure
+    to determine how similar the faces are.
+    """
     @staticmethod
     def prewhiten(x):
         mean = np.mean(x)
@@ -321,12 +369,9 @@ class ExtractEncodingsResNet1(Stage):
     def init_stage(self, config):
         with tf.Graph().as_default():
             # Configure GPU settings.
-            # @TODO: Support loading full GPU options dict from config. This would require supporting nested environment overrides (see utils.py).
             if config["gpuDynamicMemoryAllocation"]:
-                LOGGER.info("Tensorflow will use dynamic GPU memory allocation.")
                 gpu_options = tf.GPUOptions(allow_growth=True)
             else:
-                LOGGER.info("Tensorflow will use preconfigured GPU memory fraction of {}".format(config["perProcessGpuMemoryFraction"]))
                 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=config["perProcessGpuMemoryFraction"])
 
             self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
@@ -354,20 +399,21 @@ class ExtractEncodingsResNet1(Stage):
         if self.has_model:
             image_size = 160
 
-            # Create data structure for holding the image that is expected by the Neural Network
+            # Create data structure for holding the image that is expected by the neural network.
             images = np.zeros((len(surround_data.face_filtered_boxes), image_size, image_size, 3))
 
             for i, face in enumerate(surround_data.face_filtered_boxes):
-                # Crop and resize image
+                # Crop and resize image.
                 image = surround_data.image_array[face[1]:face[3], face[0]:face[2]]
                 resized = cv2.resize(image, (image_size, image_size), interpolation = cv2.INTER_LINEAR)
                 self.resized_images.append(resized)
                 images[i,:,:,:] = self.prewhiten(resized)
 
-            # Extract encodings
-            feed_dict = {self.images_placeholder:images, self.phase_train_placeholder:False }
-            face_encodings = self.sess.run(self.embeddings, feed_dict=feed_dict)
-            surround_data.face_encodings = face_encodings.tolist()
+            # Extract encodings.
+            feed_dict = {self.images_placeholder:images, self.phase_train_placeholder:False}
+            face_encodings = self.sess.run(self.embeddings, feed_dict=feed_dict).tolist()
+            surround_data.face_encodings = face_encodings
+            surround_data.output_data["face_encodings"] = face_encodings
         else:
-            surround_data.error = { "error": "NO_MODEL_ENCODING"}
+            surround_data.error = dict(error="NO_MODEL_FOR_FACE_ENCODING")
             return
