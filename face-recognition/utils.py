@@ -2,11 +2,6 @@ import os
 import numpy
 import itertools
 import glob
-import datetime
-import enum
-import json
-import rfc3339
-from dateutil import parser
 
 
 def is_valid_dir(arg_parser, arg):
