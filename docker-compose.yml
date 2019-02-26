@@ -17,6 +17,8 @@ services:
       - stack
     devices:
       - /dev/video0:/dev/video0
+    entrypoint: python3 -m face-recognition
+    command: server -w
 
   # PostgreSQL RDBMS
   postgres:

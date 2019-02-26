@@ -1,6 +1,7 @@
 import logging
 import argparse
 import os
+import sys
 import json
 from surround import Surround, Config
 from .stages import face_recognition_pipeline, FaceRecognitionPipelineData
@@ -93,9 +94,12 @@ if __name__ == "__main__":
         if args.webcam:
             webcam_server = WebcamServer()
             webcam_server.listen(8889)
-            logging.info("Webcam TCP server listening on 8889")
+            if not webcam_server.vs.stopped:
+                logging.info("Webcam TCP server listening on 8889")
 
         IOLoop.instance().start()
         logging.info("Server has shut down.")
     elif args.mode == "batch":
         process_image_dir(args.input_dir, args.output_dir, args.config_file)
+    else:
+        parser.print_help(sys.stderr)

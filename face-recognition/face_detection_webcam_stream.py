@@ -2,8 +2,10 @@ from imutils.video import WebcamVideoStream
 import cv2
 import numpy as np
 import os
+import logging
 from surround import Config
 
+LOGGER = logging.getLogger(__name__)
 
 # Load config file.
 CONFIG = Config()
@@ -19,6 +21,7 @@ class FaceDetectionWebcamStream(WebcamVideoStream):
 	"""
 	def __init__(self, src=0, name="FaceDetectionWebcamStream"):
 		super().__init__(src, name)
+		self.src = src
 		self.grabbed = False
 		self.boxes = []
 		self.net = cv2.dnn.readNetFromCaffe(
@@ -33,6 +36,11 @@ class FaceDetectionWebcamStream(WebcamVideoStream):
 		# Keep looping infinitely until the thread is stopped.
 		while True:
 			if self.stopped:
+				return
+
+			if self.stream is None or not self.stream.isOpened():
+				LOGGER.error("Camera device {} not found. Stopping stream.".format(self.src))
+				self.stop()
 				return
 
 			# Read the next frame from the stream.
