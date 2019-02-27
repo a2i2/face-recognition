@@ -20,8 +20,7 @@ services:
       - 8889:8889
     networks:
       - stack
-<<<<<<< 2a29718a7aa0033b08a46282cce4acb35a2dde10
-    entrypoint: python3 -m face-recognition
+    entrypoint: ["python3", "-m", "facerecognition"]
     # ==[OSX,Windows]============
     command: server
     # ==[Linux]==================
@@ -29,12 +28,6 @@ services:
     #   - /dev/video0:/dev/video0
     # command: server --webcam
     # ===========================
-=======
-    devices:
-      - /dev/video0:/dev/video0
-    entrypoint: ["python3", "-m", "face-recognition"]
-    command: server -w
->>>>>>> CONFIG: Add docker setup for worker pipeline
 
   # PostgreSQL RDBMS for storing people/faces.
   postgres:

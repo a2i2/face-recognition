@@ -31,7 +31,7 @@ def init_worker_process(**kwargs):
     pipeline.init_stages()
 
 
-@app.task(time_limit=5)
+@app.task(time_limit=60)
 def encode(path):
     data = FaceRecognitionPipelineData(path)
     pipeline.process(data)

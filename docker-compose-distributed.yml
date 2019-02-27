@@ -13,7 +13,7 @@ services:
       - ./data/input:/var/lib/face-recognition/input
     networks:
       - stack
-    entrypoint: ["celery", "-A", "face-recognition.worker"]
+    entrypoint: ["celery", "-A", "facerecognition.worker"]
     command: worker --concurrency 4 --loglevel=info
 
   # Provides a REST API and browser dashboard for inspecting workers and queueing jobs.
@@ -29,7 +29,7 @@ services:
       - celery
       - flower
       - -A
-      - face-recognition.worker
+      - facerecognition.worker
       - --broker=amqp://guest@rabbitmq:5672
       - --result-backend=redis://redis
 

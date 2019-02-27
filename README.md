@@ -6,17 +6,20 @@ This project demonstrates how Surround can be used to build a facial recognition
 
 ## Usage
 
-For usage instructions, run `python3 -m face-recognition -h`.
+For usage instructions, run `python3 -m facerecognition -h`.
 
 ### Summary
 
-The pipeline can be run in two different modes: `server` and `batch`:
+The pipeline can be run in three different modes: `server`, `batch`, and `worker`:
 * `server` mode:
-  - Usage: `python3 -m face-recognition server [-w]`
+  - Usage: `python3 -m facerecognition server [-w]`
   - Description: Runs an HTTP server that provides REST endpoints for person/face registration and recognition. Additionally, the `-w`/`--webcam` flag can be used to run a TCP server alongside the HTTP server that will provide frames and face detection from a local webcam. NOTE: This currently only works on Linux. See the [Known Issues](#known-issues) section.
 * `batch` mode:
-  - Usage: `python3 -m face-recognition batch`
+  - Usage: `python3 -m facerecognition batch`
   - Description: Processes a directory of image files and produce an encoding for each one.
+* `worker` mode:
+  - Usage: `celery -A facerecognition.worker worker`
+  - Description: Run a Celery worker that will listen to the configured broker for face encoding jobs.
 
 For detailed usage, supply `-h` to each subcommand.
 
@@ -56,10 +59,35 @@ An easy way to test the endpoints is to import the [Postman](https://www.getpost
 Batch mode can be used to encode a directory of images and produce an encoding for each one. To test, run the following:
 
 ```
-python3 -m face-recognition -i data/input -o data/output -c face-recognition/config.yaml
+python3 -m facerecognition -i data/input -o data/output -c facerecognition/config.yaml
 ```
 
 Then, check the `data/output` directory for encoding output.
+
+### Worker mode
+
+Worker mode can be used to encode large volumes of images. This mode requires a RabbitMQ and Redis server for job/result management. The easiest way to test this is to run via docker-compose:
+
+```
+docker-compose -f docker-compose-distributed.yml up
+```
+
+This will run a worker alongside all required backing services, and will share the `data/input` directory into the Docker container to the target path `/var/lib/face-recognition/input`.
+
+You can visit the Flower dashboard at `localhost:5555` to view worker/job status, and send jobs via cURL:
+
+```
+curl -X POST -d '{"args":["/var/lib/face-recognition/input/beyonce.PNG"]}' http://localhost:5555/api/task/async-apply/face-recognition.worker.encode
+```
+
+You can also interact with the workers from the Python repl as follows:
+
+```
+>>> from facerecognition.worker import encode
+>>> encode.delay("/var/lib/face-recognition/input/beyonce.PNG")
+<AsyncResult: bbe00661-d417-4596-b122-30e23df8beff>
+>>>
+```
 
 ## Docker image
 
@@ -78,3 +106,4 @@ docker-compose up
 ## Known issues
 
 1. The webcam feed only works on Linux because [extra steps](https://stackoverflow.com/questions/41023827/accessing-usb-webcam-hosted-on-os-x-from-a-docker-container) are required to share a webcam with Docker on OSX/Windows hosts.
+2. `worker` mode currently does nothing with the results; it is there mostly for demonstration purposes.

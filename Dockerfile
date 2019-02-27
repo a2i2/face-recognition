@@ -25,5 +25,5 @@ RUN rm -rf /root/.cache/pip /var/lib/apt/lists/*
 COPY . /usr/local/src/a2i2/face-recognition
 
 WORKDIR /usr/local/src/a2i2/face-recognition
-ENTRYPOINT ["python3", "-m", "face-recognition"]
+ENTRYPOINT ["python3", "-m", "facerecognition"]
 CMD []
