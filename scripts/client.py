@@ -1,3 +1,5 @@
+import numpy
+import base64
 import cv2
 import sys
 import io
@@ -32,9 +34,9 @@ class Client(TCPClient):
                     try:
                         data = yield stream.read_until(self.msg_separator)
                         body = data.rstrip(self.msg_separator)
-
-                        frame = pickle.loads(body, fix_imports=True, encoding="bytes")
-                        cv2.imshow('ImageWindow', frame)
+                        bytes = base64.b64decode(body)
+                        frame = cv2.imdecode(numpy.fromstring(bytes, numpy.uint8), cv2.IMREAD_COLOR)
+                        cv2.imshow("ImageWindow", frame)
                         cv2.waitKey(1)
                     except EOFError:
                         pass
