@@ -13,7 +13,7 @@ For usage instructions, run `python3 -m face-recognition -h`.
 The pipeline can be run in two different modes: `server` and `batch`:
 * `server` mode:
   - Usage: `python3 -m face-recognition server [-w]`
-  - Description: Runs an HTTP server that provides REST endpoints for person/face registration and recognition. Additionally, the `-w` flag can be used to run a TCP server alongside the HTTP server that will provide frames and face detection from a local webcam.
+  - Description: Runs an HTTP server that provides REST endpoints for person/face registration and recognition. Additionally, the `-w`/`--webcam` flag can be used to run a TCP server alongside the HTTP server that will provide frames and face detection from a local webcam. NOTE: This currently only works on Linux. See the [Known Issues](#known-issues) section.
 * `batch` mode:
   - Usage: `python3 -m face-recognition batch`
   - Description: Processes a directory of image files and produce an encoding for each one.
@@ -74,3 +74,7 @@ Running in `server` mode requires a PostgreSQL server to store registered people
 ```
 docker-compose up
 ```
+
+## Known issues
+
+1. The webcam feed only works on Linux because [extra steps](https://stackoverflow.com/questions/41023827/accessing-usb-webcam-hosted-on-os-x-from-a-docker-container) are required to share a webcam with Docker on OSX/Windows hosts.

@@ -1,6 +1,10 @@
 ---
 version: '3.2'
 services:
+  # NOTE: Webcam feed currently only works on Linux because
+  # extra steps are required to share the video device on OSX/Windows.
+  # To test webcam functionality on Linux, comment out the "OSX,Windows"
+  # section below and uncomment the "Linux" section.
   face-recognition:
     image: dstilab/face-recognition:0.1
     build:
@@ -15,10 +19,14 @@ services:
       - 8889:8889
     networks:
       - stack
-    devices:
-      - /dev/video0:/dev/video0
     entrypoint: python3 -m face-recognition
-    command: server -w
+    # ==[OSX,Windows]============
+    command: server
+    # ==[Linux]==================
+    # devices:
+    #   - /dev/video0:/dev/video0
+    # command: server --webcam
+    # ===========================
 
   # PostgreSQL RDBMS
   postgres:
