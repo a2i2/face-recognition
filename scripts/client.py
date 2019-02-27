@@ -6,8 +6,6 @@ import io
 import socket
 import struct
 import time
-import pickle
-from pickle import UnpicklingError
 import zlib
 
 from tornado import gen
@@ -39,8 +37,6 @@ class Client(TCPClient):
                         cv2.imshow("ImageWindow", frame)
                         cv2.waitKey(1)
                     except EOFError:
-                        pass
-                    except UnpicklingError:
                         pass
                     except StreamClosedError:
                         raise

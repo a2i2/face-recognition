@@ -4,7 +4,6 @@ from tornado.iostream import StreamClosedError
 from tornado.tcpserver import TCPServer
 from .face_detection_webcam_stream import FaceDetectionWebcamStream
 import imutils
-import pickle
 import cv2
 import time
 import json
