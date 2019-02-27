@@ -1,0 +1,55 @@
+---
+version: '3.2'
+services:
+  # NOTE: Webcam feed currently only works on Linux because
+  # extra steps are required to share the video device on OSX/Windows.
+  # To test webcam functionality on Linux, comment out the "OSX,Windows"
+  # section below and uncomment the "Linux" section.
+  face-recognition:
+    image: dstilab/face-recognition:0.1
+    build:
+      context: .
+    environment:
+      SURROUND_POSTGRES_USER: postgres
+      SURROUND_POSTGRES_PASSWORD: postgres
+      SURROUND_POSTGRES_HOST: postgres
+      SURROUND_POSTGRES_PORT: "5432"
+    ports:
+      - 8888:8888
+      - 8889:8889
+    networks:
+      - stack
+    entrypoint: python3 -m face-recognition
+    # ==[OSX,Windows]============
+    command: server
+    # ==[Linux]==================
+    # devices:
+    #   - /dev/video0:/dev/video0
+    # command: server --webcam
+    # ===========================
+
+  # PostgreSQL RDBMS
+  postgres:
+    image: postgres:9.5-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=face_recognition
+      - TZ=UTC
+      - PGTZ=UTC
+    volumes:
+      - ./resources/db/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      - stack
+    restart: always
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  stack:
+    driver: bridge
