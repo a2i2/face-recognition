@@ -26,3 +26,6 @@ webcamStream:                                                    # Webcam stream
   drawBox: true                                                  #   Whether to draw a box around detected faces
   minConfidence: 0.5                                             #   Discard detections below this confidence level
   highConfidence: 0.9                                            #   Confidence values at or above this level are deemed to be 'highly confident'
+celery:
+  broker: pyamqp://guest@localhost
+  backend: redis://localhost

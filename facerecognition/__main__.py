@@ -3,6 +3,8 @@ import argparse
 import os
 import sys
 import json
+from celery import current_app, Celery
+from celery.bin import worker
 from surround import Surround, Config
 from .stages import face_recognition_pipeline, FaceRecognitionPipelineData
 from .server import FaceRecognitionWebApplication
@@ -35,7 +37,6 @@ def argument_parser():
                                          type=lambda x: is_valid_dir(batch, x))
     batch.add_argument("-c", "--config-file", required=True, help="Path to config file",
                                          type=lambda x: is_valid_file(batch, x))
-
     return parser
 
 
@@ -83,7 +84,7 @@ def process_image_dir(input_dir, output_dir, config_path):
 if __name__ == "__main__":
     # Parse command-line arguments.
     parser = argument_parser()
-    args = parser.parse_args()
+    args, extra_args = parser.parse_known_args()
 
     # Run pipeline in 'server' or 'batch' mode.
     if args.mode == "server":

@@ -1,0 +1,69 @@
+---
+version: '3.2'
+services:
+  # Celery worker running face recognition pipeline.
+  face-recognition-worker:
+    image: dstilab/face-recognition:0.2
+    build:
+      context: .
+    environment:
+      SURROUND_CELERY_BROKER: pyamqp://guest@rabbitmq
+      SURROUND_CELERY_BACKEND: redis://redis
+    volumes:
+      - ./data/input:/var/lib/face-recognition/input
+    networks:
+      - stack
+    entrypoint: ["celery", "-A", "facerecognition.worker"]
+    command: worker --concurrency 4 --loglevel=info
+
+  # Provides a REST API and browser dashboard for inspecting workers and queueing jobs.
+  flower:
+    image: dstilab/face-recognition:0.2
+    build:
+      context: .
+    ports:
+      - 5555:5555
+    networks:
+      - stack
+    entrypoint:
+      - celery
+      - flower
+      - -A
+      - facerecognition.worker
+      - --broker=amqp://guest@rabbitmq:5672
+      - --result-backend=redis://redis
+
+  # Provides a result backend for the Celery workers.
+  # NOTE: This is only for example purposes; you can choose whatever backend you like
+  # or have no result backend at all.
+  redis:
+    image: redis:5.0.3-alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data
+    networks:
+      - stack
+    entrypoint: ["redis-server", "--appendonly", "yes"]
+
+  # Provides the queueing backend for distributing jobs to Celery workers.
+  rabbitmq:
+    image: rabbitmq:3.7.2-management-alpine
+    hostname: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - stack
+
+volumes:
+  redis-data:
+    driver: local
+  rabbitmq-data:
+    driver: local
+
+networks:
+  stack:
+    driver: bridge

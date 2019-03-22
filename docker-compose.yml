@@ -1,12 +1,13 @@
 ---
 version: '3.2'
 services:
+  # Face recognition pipeline running in server mode.
   # NOTE: Webcam feed currently only works on Linux because
   # extra steps are required to share the video device on OSX/Windows.
   # To test webcam functionality on Linux, comment out the "OSX,Windows"
   # section below and uncomment the "Linux" section.
   face-recognition:
-    image: dstilab/face-recognition:0.1
+    image: dstilab/face-recognition:0.2
     build:
       context: .
     environment:
@@ -19,7 +20,7 @@ services:
       - 8889:8889
     networks:
       - stack
-    entrypoint: python3 -m face-recognition
+    entrypoint: ["python3", "-m", "facerecognition"]
     # ==[OSX,Windows]============
     command: server
     # ==[Linux]==================
@@ -28,7 +29,7 @@ services:
     # command: server --webcam
     # ===========================
 
-  # PostgreSQL RDBMS
+  # PostgreSQL RDBMS for storing people/faces.
   postgres:
     image: postgres:9.5-alpine
     environment:

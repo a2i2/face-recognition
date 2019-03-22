@@ -14,6 +14,9 @@ RUN pip3 install tensorflow==1.8.0
 RUN pip3 install tornado==5.1.1
 RUN pip3 install psycopg2==2.7.7
 RUN pip3 install imutils==0.5.2
+RUN pip3 install celery==4.2.1
+RUN pip3 install flower==0.9.2
+RUN pip3 install redis==2.10.6
 
 # Clean up to reduce image size.
 RUN rm -rf /root/.cache/pip /var/lib/apt/lists/*
@@ -22,5 +25,5 @@ RUN rm -rf /root/.cache/pip /var/lib/apt/lists/*
 COPY . /usr/local/src/a2i2/face-recognition
 
 WORKDIR /usr/local/src/a2i2/face-recognition
-ENTRYPOINT ["python3", "-m", "face-recognition"]
+ENTRYPOINT ["python3", "-m", "facerecognition"]
 CMD []
