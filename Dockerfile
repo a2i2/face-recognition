@@ -21,8 +21,12 @@ RUN pip3 install redis==2.10.6
 # Clean up to reduce image size.
 RUN rm -rf /root/.cache/pip /var/lib/apt/lists/*
 
+# Prepare directory for output images.
+RUN mkdir -p /output
+
 # Copy code and config.
 COPY . /usr/local/src/a2i2/face-recognition
+COPY ./facerecognition/config.yaml /config.yaml
 
 WORKDIR /usr/local/src/a2i2/face-recognition
 ENTRYPOINT ["python3", "-m", "facerecognition"]
