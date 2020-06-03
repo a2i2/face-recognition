@@ -94,7 +94,7 @@ You can also interact with the workers from the Python repl as follows:
 This project is available as a Docker image, which can be run via the following command (As above, supply `server` or `batch` to choose the operating mode):
 
 ```
-docker run dstilab/face-recognition
+docker run a2i2/face-recognition
 ```
 
 Running in `server` mode requires a PostgreSQL server to store registered people/faces. The easiest way to do this is to run via docker-compose:
