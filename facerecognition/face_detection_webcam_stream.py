@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 import os
 import logging
-import base64
 from surround import Config
 
 LOGGER = logging.getLogger(__name__)
@@ -84,12 +83,6 @@ class FaceDetectionWebcamStream(WebcamVideoStream):
 
 			# Update data for clients to consume.
 			# @TODO: Thread safety
+			self.grabbed = grabbed
 			self.frame = frame
 			self.boxes = boxes
-			result, bmp = cv2.imencode(".bmp", frame)
-			b64 = base64.b64encode(bmp)
-			self.frame_base64 = b64
-			self.grabbed = grabbed
-
-	def read_base64(self):
-		return self.frame_base64

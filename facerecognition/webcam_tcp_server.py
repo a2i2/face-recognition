@@ -6,6 +6,7 @@ from .face_detection_webcam_stream import FaceDetectionWebcamStream
 import imutils
 import cv2
 import time
+import pickle
 import json
 import numpy as np
 import tornado.ioloop
@@ -48,8 +49,9 @@ class WebcamServer(TCPServer):
                     return
                 else:
                     try:
-                        frame = self.vs.read_base64()
-                        yield stream.write(frame + self.message_separator)
+                        frame = self.vs.read()
+                        data = pickle.dumps(frame, 0)
+                        yield stream.write(data + self.message_separator)
                     except StreamClosedError:
                         print("Stream closed: {}".format(address))
                         stream.close(exc_info=True)
