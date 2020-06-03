@@ -39,7 +39,7 @@ class FaceRecognitionWebApplication(tornado.web.Application):
         self.pipeline.set_config(self.config)
         self.pipeline.init_stages()
 
-        init_args = dict(config=self.config, pipeline=self.pipeline, postgres_client=self.postgres_client)
+        init_args = dict(config=self.config, pipeline=self.pipeline, postgres_client=self.postgres_client, start_time=self.start_time)
 
         kwargs["handlers"] = [
             (r"/", HomeHandler, init_args),
@@ -68,10 +68,11 @@ class FaceRecognitionWebHandler(tornado.web.RequestHandler):
     """
     Base class for web handlers that will accept requests with application/json content-type.
     """
-    def initialize(self, config, pipeline, postgres_client):
+    def initialize(self, config, pipeline, postgres_client, start_time):
         self.config = config
         self.pipeline = pipeline
         self.postgres_client = postgres_client
+        self.start_time = start_time
 
     def prepare(self):
         """
@@ -117,7 +118,7 @@ class HomeHandler(FaceRecognitionWebHandler):
     def get(self):
         self.write(dict(
             app="A2I2 Face Recognition",
-            version="0.1",  # @TODO: Link up to actual version
+            version="0.2",  # @TODO: Link up to actual version
             uptime=str(datetime.datetime.now() - self.start_time)
         ))
 
